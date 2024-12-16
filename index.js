@@ -1,6 +1,12 @@
 import express from "express";
 import cors from "cors";
 import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 app.use(express.json());
@@ -8,11 +14,9 @@ app.use(cors());
 
 const port = process.env.PORT || 3001;
 
-const path = require('path');
-
 // Arquivo JSON para armazenar os usuários e agendamentos
-const usersFilePath = "./users.json";
-const agendamentosFilePath = "./agendamentos.json";
+const usersFilePath = path.join(__dirname, "users.json");
+const agendamentosFilePath = path.join(__dirname, "agendamentos.json");
 
 // Funções para manipular os usuários
 const insertUser = (nome, email, senha, cpf, contato) => {
