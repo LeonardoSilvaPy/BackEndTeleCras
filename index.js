@@ -8,26 +8,11 @@ app.use(cors());
 
 const port = process.env.PORT || 3001;
 
-const fs = require('fs');
 const path = require('path');
 
-// Caminhos dos arquivos JSON
-const usersFilePath = path.join(__dirname, 'users.json');
-const agendamentosFilePath = path.join(__dirname, 'agendamentos.json');
-
-// Função para garantir que o arquivo existe, caso contrário, cria um arquivo vazio
-function ensureFileExists(filePath) {
-  // Verifica se o arquivo já existe
-  if (!fs.existsSync(filePath)) {
-    console.log(`Arquivo não encontrado, criando ${filePath}`);
-    // Se o arquivo não existir, cria um arquivo vazio
-    fs.writeFileSync(filePath, JSON.stringify([])); // Criar com um array vazio
-  }
-}
-
-// Garante que ambos os arquivos existam
-ensureFileExists(usersFilePath);
-ensureFileExists(agendamentosFilePath);
+// Arquivo JSON para armazenar os usuários e agendamentos
+const usersFilePath = "./users.json";
+const agendamentosFilePath = "./agendamentos.json";
 
 // Funções para manipular os usuários
 const insertUser = (nome, email, senha, cpf, contato) => {
