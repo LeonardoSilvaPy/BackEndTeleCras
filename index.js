@@ -1,12 +1,6 @@
 import express from "express";
 import cors from "cors";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { connectToDatabase } from "./database.js"; // Conexão com o MongoDB
 
 const app = express();
 app.use(express.json());
@@ -14,36 +8,25 @@ app.use(cors());
 
 const port = process.env.PORT || 3001;
 
-// Arquivo JSON para armazenar os usuários e agendamentos
-const usersFilePath = path.join(__dirname, "users.json");
-const agendamentosFilePath = path.join(__dirname, "agendamentos.json");
+let db;
 
 // Funções para manipular os usuários
-const insertUser = (nome, email, senha, cpf, contato) => {
-  const users = JSON.parse(fs.readFileSync(usersFilePath, "utf-8")) || [];
-  const newUser = {
-    id: Math.random().toString(36),
-    nome,
-    email,
-    senha,
-    cpf,
-    contato,
-  };
-  users.push(newUser);
-  fs.writeFileSync(usersFilePath, JSON.stringify(users, null, 2));
+const insertUser = async (nome, email, senha, cpf, contato) => {
+  const collection = db.collection("users");
+  const newUser = { nome, email, senha, cpf, contato, createdAt: new Date() };
+  await collection.insertOne(newUser);
   return newUser;
 };
 
-const loginUser = (email, senha) => {
-  const users = JSON.parse(fs.readFileSync(usersFilePath, "utf-8")) || [];
-  return users.find(user => user.email === email && user.senha === senha);
+const loginUser = async (email, senha) => {
+  const collection = db.collection("users");
+  return await collection.findOne({ email, senha });
 };
 
 // Funções para manipular os agendamentos
-const insertAgendamento = (nome, cpf, servico, contato, local, dataAgendamento, horaAgendamento) => {
-  const agendamentos = JSON.parse(fs.readFileSync(agendamentosFilePath, "utf-8")) || [];
+const insertAgendamento = async (nome, cpf, servico, contato, local, dataAgendamento, horaAgendamento) => {
+  const collection = db.collection("agendamentos");
   const newAgendamento = {
-    id: Math.random().toString(36),
     nome,
     cpf,
     servico,
@@ -51,112 +34,100 @@ const insertAgendamento = (nome, cpf, servico, contato, local, dataAgendamento, 
     local,
     data: dataAgendamento,
     hora: horaAgendamento,
+    createdAt: new Date(),
   };
-  agendamentos.push(newAgendamento);
-  fs.writeFileSync(agendamentosFilePath, JSON.stringify(agendamentos, null, 2));
+  await collection.insertOne(newAgendamento);
   return newAgendamento;
 };
 
-const getAgendamentos = (cpf) => {
-  const agendamentos = JSON.parse(fs.readFileSync(agendamentosFilePath, "utf-8")) || [];
-  return agendamentos.filter(agendamento => agendamento.cpf === cpf);
+const getAgendamentos = async (cpf) => {
+  const collection = db.collection("agendamentos");
+  return await collection.find({ cpf }).toArray();
 };
 
-// Rotas de Cadastro e Login
-
-app.post("/cadastro", (req, res) => {
+// Rota de Cadastro de Usuários
+app.post("/cadastro", async (req, res) => {
   const { nome, email, senha, cpf, contato } = req.body;
 
-  // Verifica se todos os campos obrigatórios foram fornecidos
   if (!nome || !email || !senha || !cpf || !contato) {
-    return res.status(404).json({ message: "Nome, email, senha, CPF e contato são obrigatórios" });
-  }
-
-  // Validação básica do CPF
-  if (cpf.length !== 11 || !cpf.match(/^\d+$/)) {
-    return res.status(404).json({ message: "CPF inválido. Deve conter 11 dígitos numéricos." });
-  }
-
-  // Validação básica do contato
-  if (contato.length < 10 || !contato.match(/^\d+$/)) {
-    return res.status(404).json({ message: "Contato inválido. Deve conter pelo menos 10 dígitos numéricos." });
+    return res.status(404).json({ message: "Todos os campos são obrigatórios" });
   }
 
   try {
-    const novoUsuario = insertUser(nome, email, senha, cpf, contato);
+    const novoUsuario = await insertUser(nome, email, senha, cpf, contato);
     return res.status(201).json({ message: "Usuário cadastrado com sucesso!", usuario: novoUsuario });
   } catch (e) {
     return res.status(500).json({ message: `Erro ao cadastrar usuário: ${e.message}` });
   }
 });
 
-app.post("/login", (req, res) => {
+// Rota de Login de Usuários
+app.post("/login", async (req, res) => {
   const { email, senha } = req.body;
 
   if (!email || !senha) {
     return res.status(404).json({ message: "Email e senha são obrigatórios" });
   }
 
-  const usuario = loginUser(email, senha);
-
-  if (usuario) {
-    return res.status(200).json({
-      message: "Login bem-sucedido",
-      user: {
-        cpf: usuario.cpf,
-        nome: usuario.nome,
-        email: usuario.email
-      }
-    });
-  } else {
-    return res.status(401).json({ message: "Credenciais inválidas" });
+  try {
+    const usuario = await loginUser(email, senha);
+    if (usuario) {
+      return res.status(200).json({
+        message: "Login bem-sucedido",
+        user: {
+          cpf: usuario.cpf,
+          nome: usuario.nome,
+          email: usuario.email,
+        },
+      });
+    } else {
+      return res.status(401).json({ message: "Credenciais inválidas" });
+    }
+  } catch (e) {
+    return res.status(500).json({ message: `Erro ao realizar login: ${e.message}` });
   }
 });
 
-// Rotas de Agendamento
-
-app.post("/agendamentos", (req, res) => {
+// Rota de Agendamento
+app.post("/agendamentos", async (req, res) => {
   const { nome, cpf, servico, contato, local, data, hora } = req.body;
 
-  // Verifica se todos os campos obrigatórios foram fornecidos
   if (!nome || !cpf || !servico || !contato || !local || !data || !hora) {
     return res.status(404).json({ message: "Todos os campos são obrigatórios" });
   }
 
   try {
-    const novoAgendamento = insertAgendamento(nome, cpf, servico, contato, local, data, hora);
+    const novoAgendamento = await insertAgendamento(nome, cpf, servico, contato, local, data, hora);
     return res.status(201).json({ message: "Agendamento criado com sucesso!", agendamento: novoAgendamento });
   } catch (e) {
     return res.status(500).json({ message: `Erro ao criar agendamento: ${e.message}` });
   }
 });
 
-app.get("/agendamentos", (req, res) => {
-  const cpf = req.query.cpf;
+// Rota para listar Agendamentos
+app.get("/agendamentos", async (req, res) => {
+  const { cpf } = req.query;
 
-  // Verifica se o CPF foi fornecido
   if (!cpf) {
     return res.status(404).json({ message: "CPF é obrigatório para listar agendamentos" });
   }
 
   try {
-    const agendamentos = getAgendamentos(cpf);
-    return res.status(200).json(agendamentos.map(agendamento => ({
-      id: agendamento.id,
-      nome: agendamento.nome,
-      cpf: agendamento.cpf,
-      servico: agendamento.servico,
-      contato: agendamento.contato,
-      local: agendamento.local,
-      data: agendamento.data,
-      hora: agendamento.hora,
-    })));
+    const agendamentos = await getAgendamentos(cpf);
+    return res.status(200).json(agendamentos);
   } catch (e) {
     return res.status(500).json({ message: `Erro ao buscar agendamentos: ${e.message}` });
   }
 });
 
-// Inicia o servidor
-app.listen(port, () => {
-  console.log(`Listening on port ${port}`);
-});
+// Conectar ao banco e iniciar o servidor
+connectToDatabase()
+  .then((database) => {
+    db = database;
+    app.listen(port, () => {
+      console.log(`Servidor rodando na porta ${port}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Erro ao conectar ao banco de dados:", err);
+  });
