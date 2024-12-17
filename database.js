@@ -20,4 +20,5 @@ async function connectToDatabase() {
   }
 }
 
-export default connectToDatabase;
+// Exporte a função connectToDatabase corretamente
+export { connectToDatabase };
