@@ -13,7 +13,7 @@ async function connectToDatabase() {
   try {
     await client.connect();
     console.log("Conexão com o MongoDB bem-sucedida!");
-    return client.db("nome-do-banco"); // Substitua pelo nome do seu banco
+    return client.db("telecras");
   } catch (error) {
     console.error("Erro ao conectar ao MongoDB:", error.message);
     throw error;
